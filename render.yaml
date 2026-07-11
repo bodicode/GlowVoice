@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: glowvoice-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: FRONTEND_URL
+        value: https://your-app.vercel.app
+    healthCheckPath: /

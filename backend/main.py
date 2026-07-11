@@ -18,6 +18,9 @@ from gtts import gTTS
 app = FastAPI(title="GlowVoice TTS API", version="2.0.0")
 
 # Allow CORS for frontend
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "*")
+allowed_origins = [FRONTEND_URL] if FRONTEND_URL != "*" else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
