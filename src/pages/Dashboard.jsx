@@ -158,12 +158,19 @@ const Dashboard = () => {
 
   const handleDeleteSingle = async (id, e) => {
     e.stopPropagation();
-    const deletePromise = supabase.from('generations').delete().eq('id', id);
+    
+    const deletePromise = new Promise(async (resolve, reject) => {
+      const { error } = await supabase.from('generations').delete().eq('id', id);
+      if (error) reject(error);
+      else resolve();
+    });
+
     toast.promise(deletePromise, {
       loading: 'Đang xóa...',
       success: 'Đã xóa bản ghi',
-      error: 'Lỗi khi xóa'
+      error: (err) => `Lỗi: ${err.message}`
     });
+
     try {
       await deletePromise;
       setHistory(prev => prev.filter(item => item.id !== id));
@@ -171,25 +178,32 @@ const Dashboard = () => {
         setIsPlaying(false);
       }
     } catch (err) {
-      console.error(err);
+      console.error('Delete failed:', err);
     }
   };
 
   const handleDeleteSelected = async () => {
     if (selectedIds.length === 0) return;
-    const deletePromise = supabase.from('generations').delete().in('id', selectedIds);
+
+    const deletePromise = new Promise(async (resolve, reject) => {
+      const { error } = await supabase.from('generations').delete().in('id', selectedIds);
+      if (error) reject(error);
+      else resolve();
+    });
+
     toast.promise(deletePromise, {
       loading: `Đang xóa ${selectedIds.length} bản ghi...`,
       success: 'Đã xóa thành công',
-      error: 'Lỗi khi xóa'
+      error: (err) => `Lỗi: ${err.message}`
     });
+
     try {
       await deletePromise;
       setHistory(prev => prev.filter(item => !selectedIds.includes(item.id)));
       setIsSelectMode(false);
       setSelectedIds([]);
     } catch (err) {
-      console.error(err);
+      console.error('Bulk delete failed:', err);
     }
   };
 
