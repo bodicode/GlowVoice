@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Download, Settings, Volume2, RefreshCw, Pause, Mic } from 'lucide-react';
+import { Play, Download, Settings, Volume2, RefreshCw, Pause, Mic, Trash2, CheckSquare, Square } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
 import './Dashboard.css';
@@ -19,6 +20,8 @@ const Dashboard = () => {
   const [pitch, setPitch] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
   const [history, setHistory] = useState([]);
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
   const audioRef = useRef(null);
 
   useEffect(() => {
@@ -153,6 +156,57 @@ const Dashboard = () => {
     a.click();
   };
 
+  const handleDeleteSingle = async (id, e) => {
+    e.stopPropagation();
+    const deletePromise = supabase.from('generations').delete().eq('id', id);
+    toast.promise(deletePromise, {
+      loading: 'Đang xóa...',
+      success: 'Đã xóa bản ghi',
+      error: 'Lỗi khi xóa'
+    });
+    try {
+      await deletePromise;
+      setHistory(prev => prev.filter(item => item.id !== id));
+      if (audioUrl && history.find(h => h.id === id)?.url === audioUrl) {
+        setIsPlaying(false);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.length === 0) return;
+    const deletePromise = supabase.from('generations').delete().in('id', selectedIds);
+    toast.promise(deletePromise, {
+      loading: `Đang xóa ${selectedIds.length} bản ghi...`,
+      success: 'Đã xóa thành công',
+      error: 'Lỗi khi xóa'
+    });
+    try {
+      await deletePromise;
+      setHistory(prev => prev.filter(item => !selectedIds.includes(item.id)));
+      setIsSelectMode(false);
+      setSelectedIds([]);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === history.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(history.map(item => item.id));
+    }
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
   return (
     <div className="dashboard-page container animate-fade-in">
       <div className="dashboard-header">
@@ -268,56 +322,103 @@ const Dashboard = () => {
         </div>
 
         <div className="studio-sidebar glass-panel">
-          <h3>📋 Lịch sử</h3>
+          <div className="history-header">
+            <h3>📋 Lịch sử</h3>
+            {history.length > 0 && (
+              <button 
+                className="btn btn-outline small-btn"
+                onClick={() => {
+                  setIsSelectMode(!isSelectMode);
+                  setSelectedIds([]);
+                }}
+              >
+                {isSelectMode ? 'Hủy' : 'Chọn'}
+              </button>
+            )}
+          </div>
+
+          {isSelectMode && (
+            <div className="history-select-actions">
+              <button className="btn btn-outline small-btn" onClick={toggleSelectAll}>
+                {selectedIds.length === history.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+              </button>
+              <button 
+                className="btn btn-primary small-btn" 
+                onClick={handleDeleteSelected}
+                disabled={selectedIds.length === 0}
+                style={{ background: 'var(--error-color, #ef4444)', borderColor: 'var(--error-color, #ef4444)' }}
+              >
+                Xóa ({selectedIds.length})
+              </button>
+            </div>
+          )}
 
           <div className="history-list">
             {history.length === 0 && (
               <p className="empty-history">Chưa có bản ghi nào. Hãy thử tạo giọng đọc đầu tiên!</p>
             )}
-            {history.map(item => (
+            {history.map(item => {
+              const isSelected = selectedIds.includes(item.id);
+              return (
               <div
                 key={item.id}
-                className="history-item"
+                className={`history-item ${isSelectMode && isSelected ? 'selected' : ''}`}
                 style={{ cursor: 'pointer' }}
                 onClick={() => {
+                  if (isSelectMode) {
+                    toggleSelect(item.id);
+                    return;
+                  }
                   setScript(item.fullText);
                   if (item.voiceId) setVoiceId(item.voiceId);
                   setAudioUrl(item.url);
                   setIsPlaying(false);
                 }}
               >
-                <div className="history-info">
+                {isSelectMode && (
+                  <div className="history-checkbox">
+                    {isSelected ? <CheckSquare size={18} color="var(--accent-color)" /> : <Square size={18} color="var(--text-secondary)" />}
+                  </div>
+                )}
+                <div className="history-info" style={{ opacity: isSelectMode && !isSelected ? 0.7 : 1 }}>
                   <h4>{item.time} • {item.voice}</h4>
                   <p>"{item.text}..."</p>
                 </div>
                 <div className="history-actions">
-                  <button className="icon-btn" onClick={(e) => {
-                    e.stopPropagation();
-                    if (audioUrl === item.url && isPlaying) {
-                      audioRef.current?.pause();
-                      setIsPlaying(false);
-                    } else {
-                      setScript(item.fullText);
-                      if (item.voiceId) setVoiceId(item.voiceId);
-                      setAudioUrl(item.url);
-                      setIsPlaying(true);
-                      // Nếu đang phát cùng 1 URL nhưng bị pause, thì phát lại
-                      if (audioUrl === item.url) {
-                        audioRef.current?.play();
-                      }
-                    }
-                  }}>
-                    {audioUrl === item.url && isPlaying ? <Pause size={16} /> : <Play size={16} />}
-                  </button>
-                  <button className="icon-btn" onClick={(e) => {
-                    e.stopPropagation();
-                    handleDownload(item.url);
-                  }}>
-                    <Download size={16} />
-                  </button>
+                  {!isSelectMode && (
+                    <>
+                      <button className="icon-btn" onClick={(e) => {
+                        e.stopPropagation();
+                        if (audioUrl === item.url && isPlaying) {
+                          audioRef.current?.pause();
+                          setIsPlaying(false);
+                        } else {
+                          setScript(item.fullText);
+                          if (item.voiceId) setVoiceId(item.voiceId);
+                          setAudioUrl(item.url);
+                          setIsPlaying(true);
+                          // Nếu đang phát cùng 1 URL nhưng bị pause, thì phát lại
+                          if (audioUrl === item.url) {
+                            audioRef.current?.play();
+                          }
+                        }
+                      }}>
+                        {audioUrl === item.url && isPlaying ? <Pause size={16} /> : <Play size={16} />}
+                      </button>
+                      <button className="icon-btn" onClick={(e) => {
+                        e.stopPropagation();
+                        handleDownload(item.url);
+                      }}>
+                        <Download size={16} />
+                      </button>
+                      <button className="icon-btn" onClick={(e) => handleDeleteSingle(item.id, e)}>
+                        <Trash2 size={16} />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         </div>
       </div>
