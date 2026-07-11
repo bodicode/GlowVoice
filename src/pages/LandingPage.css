@@ -2,6 +2,17 @@
   padding-bottom: 4rem;
 }
 
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-15px); }
+  100% { transform: translateY(0px); }
+}
+
 .hero {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -34,6 +45,8 @@
 
 .hero h1 {
   margin-bottom: 1.5rem;
+  opacity: 0;
+  animation: fadeInUp 0.8s ease-out forwards;
 }
 
 .highlight {
@@ -46,6 +59,8 @@
   font-size: 1.125rem;
   margin-bottom: 2rem;
   max-width: 500px;
+  opacity: 0;
+  animation: fadeInUp 0.8s ease-out 0.2s forwards;
 }
 
 @media (max-width: 900px) {
@@ -58,6 +73,8 @@
 .hero-cta {
   display: flex;
   gap: 1rem;
+  opacity: 0;
+  animation: fadeInUp 0.8s ease-out 0.4s forwards;
 }
 
 @media (max-width: 900px) {
@@ -75,6 +92,8 @@
   gap: 2rem;
   aspect-ratio: 1;
   background: linear-gradient(145deg, rgba(30, 41, 59, 0.4), rgba(15, 23, 42, 0.8));
+  opacity: 0;
+  animation: fadeInUp 1s ease-out 0.3s forwards, float 6s ease-in-out infinite 1.3s;
 }
 
 .audio-wave-demo {
@@ -120,11 +139,19 @@
 .feature-card {
   padding: 2rem;
   text-align: left;
-  transition: transform 0.3s ease;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  opacity: 0;
+  animation: fadeInUp 0.8s ease-out forwards;
 }
 
+.feature-card:nth-child(1) { animation-delay: 0.3s; }
+.feature-card:nth-child(2) { animation-delay: 0.5s; }
+.feature-card:nth-child(3) { animation-delay: 0.7s; }
+
 .feature-card:hover {
-  transform: translateY(-5px);
+  transform: translateY(-12px) scale(1.02);
+  box-shadow: 0 15px 35px rgba(139, 92, 246, 0.2);
+  border-color: rgba(139, 92, 246, 0.4);
 }
 
 .feature-icon {

@@ -4,7 +4,7 @@ import './LandingPage.css';
 
 const LandingPage = () => {
   return (
-    <div className="landing-page animate-fade-in">
+    <div className="landing-page">
       {/* Hero Section */}
       <section className="hero container">
         <div className="hero-content">
@@ -17,9 +17,6 @@ const LandingPage = () => {
             <Link to="/auth" className="btn btn-primary">
               Bắt Đầu Ngay <Play size={18} />
             </Link>
-            <a href="#features" className="btn btn-outline">
-              Tìm Hiểu Thêm
-            </a>
           </div>
         </div>
         <div className="hero-visual glass-panel">
