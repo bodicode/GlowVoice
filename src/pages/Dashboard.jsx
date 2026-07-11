@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Download, Settings, Volume2, RefreshCw, Pause, Mic, Trash2, CheckSquare, Square } from 'lucide-react';
+import { Play, Download, Settings, Volume2, RefreshCw, Pause, Mic, Trash2, CheckSquare, Square, Headphones, RotateCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
@@ -13,6 +13,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [script, setScript] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isPreviewing, setIsPreviewing] = useState(false);
   const [audioUrl, setAudioUrl] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [voiceId, setVoiceId] = useState('vi-female');
@@ -139,6 +140,50 @@ const Dashboard = () => {
     }
   };
 
+  const handlePreviewVoice = async () => {
+    setIsPreviewing(true);
+    try {
+      const rateStr = rate >= 0 ? `+${rate}%` : `${rate}%`;
+      const pitchStr = pitch >= 0 ? `+${pitch}Hz` : `${pitch}Hz`;
+      const response = await fetch(`${API_URL}/api/generate-audio`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: "Xin chào, đây là giọng đọc thử.",
+          voice_id: voiceId,
+          rate: rateStr,
+          pitch: pitchStr
+        })
+      });
+
+      const data = await response.json();
+      if (data.status === 'success') {
+        const fullUrl = `${API_URL}${data.audio_url}`;
+        const audio = new Audio(fullUrl);
+        audio.play();
+      } else {
+        toast.error('Lỗi khi nghe thử: ' + (data.message || 'Có lỗi xảy ra'));
+      }
+    } catch (error) {
+      console.error('Preview error:', error);
+      toast.error('Không thể kết nối tới server để nghe thử.');
+    } finally {
+      setIsPreviewing(false);
+    }
+  };
+
+  const handleReset = () => {
+    setScript('');
+    setVoiceId('vi-female');
+    setRate(0);
+    setPitch(0);
+    setAudioUrl(null);
+    setIsPlaying(false);
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+  };
+
   const togglePlay = () => {
     if (!audioRef.current) return;
     if (isPlaying) {
@@ -232,15 +277,25 @@ const Dashboard = () => {
         <div className="studio-main glass-panel">
           <div className="studio-toolbar">
             <div className="voice-selector">
-              <select
-                className="input-field select-voice"
-                value={voiceId}
-                onChange={(e) => setVoiceId(e.target.value)}
-              >
-                <option value="vi-female">🎤 Hoài My (Nữ)</option>
-                <option value="vi-male">🎤 Nam Minh (Nam)</option>
-                <option value="vi-google">🤖 Chị Google (Meme)</option>
-              </select>
+              <div className="voice-selector-group">
+                <select
+                  className="input-field select-voice"
+                  value={voiceId}
+                  onChange={(e) => setVoiceId(e.target.value)}
+                >
+                  <option value="vi-female">🎤 Hoài My (Nữ)</option>
+                  <option value="vi-male">🎤 Nam Minh (Nam)</option>
+                  <option value="vi-google">🤖 Chị Google (Meme)</option>
+                </select>
+                <button 
+                  className="btn btn-outline small-btn preview-btn"
+                  onClick={handlePreviewVoice}
+                  disabled={isPreviewing}
+                  title="Nghe thử giọng đọc"
+                >
+                  {isPreviewing ? <RefreshCw size={16} className="spin" /> : <Headphones size={16} />} Nghe thử
+                </button>
+              </div>
             </div>
             <button
               className="btn btn-outline small-btn"
@@ -325,13 +380,22 @@ const Dashboard = () => {
 
           <div className="studio-footer">
             <span className="char-count">{script.length} / 5000 ký tự</span>
-            <button
-              className="btn btn-primary"
-              onClick={handleGenerate}
-              disabled={isGenerating || !script.trim()}
-            >
-              {isGenerating ? <><RefreshCw size={18} className="spin" /> Đang tạo...</> : <><Volume2 size={18} /> Tạo Giọng Đọc</>}
-            </button>
+            <div className="footer-actions" style={{ display: 'flex', gap: '1rem' }}>
+              <button
+                className="btn btn-outline"
+                onClick={handleReset}
+                disabled={!script && rate === 0 && pitch === 0 && voiceId === 'vi-female' && !audioUrl}
+              >
+                <RotateCcw size={18} /> Đặt lại
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleGenerate}
+                disabled={isGenerating || !script.trim()}
+              >
+                {isGenerating ? <><RefreshCw size={18} className="spin" /> Đang tạo...</> : <><Volume2 size={18} /> Tạo Giọng Đọc</>}
+              </button>
+            </div>
           </div>
         </div>
 
