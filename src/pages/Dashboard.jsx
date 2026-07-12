@@ -23,6 +23,7 @@ const Dashboard = () => {
   const [history, setHistory] = useState([]);
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
+  const [zaloCharsUsed, setZaloCharsUsed] = useState(0);
   const audioRef = useRef(null);
 
   useEffect(() => {
@@ -52,6 +53,21 @@ const Dashboard = () => {
             voiceId: item.voice_id,
             time: new Date(item.created_at).toLocaleTimeString('vi-VN')
           })));
+        }
+
+        // Fetch Zalo AI used characters today
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const { data: zaloData } = await supabase
+          .from('generations')
+          .select('full_text')
+          .eq('user_id', user.id)
+          .like('voice_id', 'vi-zalo-%')
+          .gte('created_at', today.toISOString());
+          
+        if (zaloData) {
+          const total = zaloData.reduce((acc, item) => acc + (item.full_text?.length || 0), 0);
+          setZaloCharsUsed(total);
         }
       } catch (err) {
         console.error('Lỗi lấy lịch sử:', err);
@@ -125,6 +141,11 @@ const Dashboard = () => {
               voiceId: insertedData.voice_id,
               time: new Date(insertedData.created_at).toLocaleTimeString('vi-VN')
             }, ...prev].slice(0, 20));
+
+            // Cập nhật số lượng ký tự Zalo AI nếu dùng giọng Zalo
+            if (voiceId.startsWith('vi-zalo-') && !data.cached) {
+              setZaloCharsUsed(prev => prev + script.length);
+            }
           }
         } catch (dbErr) {
           console.error('Lỗi kết nối DB:', dbErr);
@@ -395,7 +416,10 @@ const Dashboard = () => {
           )}
 
           <div className="studio-footer">
-            <span className="char-count">{script.length} / 5000 ký tự</span>
+            <span className="char-count">
+              {script.length} / 5000 ký tự
+              {zaloCharsUsed > 0 && <span style={{marginLeft: '15px', color: 'var(--primary-color)'}}>• Đã dùng Zalo AI: {zaloCharsUsed} ký tự hôm nay</span>}
+            </span>
             <div className="footer-actions" style={{ display: 'flex', gap: '1rem' }}>
               <button
                 className="btn btn-outline"
