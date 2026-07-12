@@ -283,9 +283,17 @@ const Dashboard = () => {
                   value={voiceId}
                   onChange={(e) => setVoiceId(e.target.value)}
                 >
-                  <option value="vi-female">🎤 Hoài My (Nữ)</option>
-                  <option value="vi-male">🎤 Nam Minh (Nam)</option>
-                  <option value="vi-google">🤖 Chị Google (Meme)</option>
+                  <optgroup label="Zalo AI (Premium)">
+                    <option value="vi-zalo-1">💎 Nữ Miền Nam (Zalo)</option>
+                    <option value="vi-zalo-2">💎 Nữ Miền Bắc (Zalo)</option>
+                    <option value="vi-zalo-3">💎 Nam Miền Nam (Zalo)</option>
+                    <option value="vi-zalo-4">💎 Nam Miền Bắc (Zalo)</option>
+                  </optgroup>
+                  <optgroup label="Tiêu chuẩn (Free)">
+                    <option value="vi-female">🎤 Hoài My (Nữ)</option>
+                    <option value="vi-male">🎤 Nam Minh (Nam)</option>
+                    <option value="vi-google">🤖 Chị Google (Meme)</option>
+                  </optgroup>
                 </select>
                 <button 
                   className="btn btn-outline small-btn preview-btn"
@@ -328,12 +336,12 @@ const Dashboard = () => {
                   value={pitch}
                   onChange={(e) => setPitch(Number(e.target.value))}
                   className="range-slider"
-                  disabled={voiceId === 'vi-google'}
+                  disabled={voiceId === 'vi-google' || voiceId.startsWith('vi-zalo-')}
                 />
               </label>
-              {voiceId === 'vi-google' && (
+              {(voiceId === 'vi-google' || voiceId.startsWith('vi-zalo-')) && (
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                  * Giọng Chị Google không hỗ trợ đổi tốc độ và độ cao.
+                  * {voiceId.startsWith('vi-zalo-') ? 'Giọng Zalo AI chỉ hỗ trợ chỉnh tốc độ, không hỗ trợ đổi độ cao (méo giọng).' : 'Giọng Chị Google không hỗ trợ đổi tốc độ và độ cao.'}
                 </p>
               )}
             </div>
@@ -367,7 +375,7 @@ const Dashboard = () => {
               </button>
               <div className="audio-info">
                 <span className="audio-label">🔊 Audio đã sẵn sàng</span>
-                <span className="audio-voice">{voiceId === 'vi-female' ? 'Hoài My' : voiceId === 'vi-male' ? 'Nam Minh' : 'Chị Google'}</span>
+                <span className="audio-voice">{voiceId === 'vi-female' ? 'Hoài My' : voiceId === 'vi-male' ? 'Nam Minh' : voiceId.startsWith('vi-zalo-') ? 'Zalo AI' : 'Chị Google'}</span>
               </div>
               <button
                 className="btn btn-outline small-btn download-btn"
