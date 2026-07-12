@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Download, Settings, Volume2, RefreshCw, Pause, Mic, Trash2, CheckSquare, Square, Headphones, RotateCcw } from 'lucide-react';
+import { Play, Download, Settings, Volume2, RefreshCw, Pause, Mic, Trash2, CheckSquare, Square, Headphones, RotateCcw, Folder, FolderPlus, FolderOpen, MoreVertical, Edit2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
 import './Dashboard.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5173';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -24,6 +24,11 @@ const Dashboard = () => {
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [zaloCharsUsed, setZaloCharsUsed] = useState(0);
+  const [projects, setProjects] = useState([]);
+  const [activeProjectId, setActiveProjectId] = useState(null);
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [projectToDelete, setProjectToDelete] = useState(null);
   const audioRef = useRef(null);
 
   useEffect(() => {
@@ -32,14 +37,37 @@ const Dashboard = () => {
       return;
     }
 
-    const fetchHistory = async () => {
+    const fetchProjects = async () => {
       try {
         const { data, error } = await supabase
+          .from('projects')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+        if (!error && data) {
+          setProjects(data);
+        }
+      } catch (err) {
+        console.error('Lỗi lấy projects:', err);
+      }
+    };
+
+    const fetchHistory = async () => {
+      try {
+        let query = supabase
           .from('generations')
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
-          .limit(20);
+          .limit(50);
+
+        if (activeProjectId) {
+          query = query.eq('project_id', activeProjectId);
+        } else {
+          query = query.is('project_id', null);
+        }
+
+        const { data, error } = await query;
 
         if (error) {
           console.error('Chưa có bảng generations hoặc lỗi:', error.message);
@@ -64,7 +92,7 @@ const Dashboard = () => {
           .eq('user_id', user.id)
           .like('voice_id', 'vi-zalo-%')
           .gte('created_at', today.toISOString());
-          
+
         if (zaloData) {
           const total = zaloData.reduce((acc, item) => acc + (item.full_text?.length || 0), 0);
           setZaloCharsUsed(total);
@@ -74,8 +102,9 @@ const Dashboard = () => {
       }
     };
 
+    fetchProjects();
     fetchHistory();
-  }, [user, navigate]);
+  }, [user, navigate, activeProjectId]);
 
   useEffect(() => {
     const max = voiceId.startsWith('vi-zalo-') ? 2000 : 5000;
@@ -118,7 +147,8 @@ const Dashboard = () => {
           full_text: script,
           audio_url: fullUrl,
           voice_name: data.voice_used,
-          voice_id: voiceId
+          voice_id: voiceId,
+          project_id: activeProjectId || null
         };
 
         try {
@@ -171,10 +201,10 @@ const Dashboard = () => {
 
   const handlePreviewVoice = async () => {
     setIsPreviewing(true);
-    
+
     // Mẹo "Unlock" âm thanh cho trình duyệt: tạo Audio và play ngay lúc click
     const audio = new Audio();
-    audio.play().catch(() => {});
+    audio.play().catch(() => { });
     audio.pause();
 
     try {
@@ -209,6 +239,172 @@ const Dashboard = () => {
     }
   };
 
+  const handleCreateProject = async (e) => {
+    e.preventDefault();
+    if (!newProjectName.trim()) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .insert([{ user_id: user.id, name: newProjectName }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setProjects([data, ...projects]);
+      setNewProjectName('');
+      setIsCreatingProject(false);
+      toast.success('Đã tạo dự án mới');
+    } catch (err) {
+      console.error('Create project error:', err);
+      toast.error('Lỗi khi tạo dự án');
+    }
+  };
+
+  const confirmDeleteProject = async (project, e) => {
+    e.stopPropagation();
+
+    try {
+      const { count, error } = await supabase
+        .from('generations')
+        .select('*', { count: 'exact', head: true })
+        .eq('project_id', project.id);
+
+      if (error) throw error;
+
+      setProjectToDelete({ ...project, fileCount: count || 0 });
+    } catch (err) {
+      console.error('Lỗi khi đếm file trong dự án:', err);
+      toast.error('Có lỗi xảy ra khi kiểm tra dự án');
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    if (!projectToDelete) return;
+
+    const deletePromise = new Promise(async (resolve, reject) => {
+      try {
+        if (projectToDelete.fileCount > 0) {
+          const { error: filesError } = await supabase
+            .from('generations')
+            .delete()
+            .eq('project_id', projectToDelete.id);
+          if (filesError) throw filesError;
+        }
+
+        const { error: projectError } = await supabase
+          .from('projects')
+          .delete()
+          .eq('id', projectToDelete.id);
+
+        if (projectError) throw projectError;
+        resolve();
+      } catch (err) {
+        reject(err);
+      }
+    });
+
+    toast.promise(deletePromise, {
+      loading: 'Đang xóa dự án...',
+      success: 'Đã xóa dự án thành công',
+      error: (err) => `Lỗi: ${err.message}`
+    });
+
+    try {
+      await deletePromise;
+    } catch (err) { } // handled by toast
+
+    try {
+      await deletePromise;
+      setProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
+      if (activeProjectId === projectToDelete.id) {
+        setActiveProjectId(null);
+      }
+      setProjectToDelete(null);
+    } catch (err) {
+      console.error('Delete project failed:', err);
+    }
+  };
+
+  const handleDragStart = (e, generationId) => {
+    e.dataTransfer.setData('generationId', generationId);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault(); // Necessary to allow dropping
+  };
+
+  const handleDrop = async (e, projectId) => {
+    e.preventDefault();
+    const generationId = e.dataTransfer.getData('generationId');
+    if (!generationId) return;
+
+    console.log('--- handleDrop Debug ---');
+    console.log('generationId:', generationId, typeof generationId);
+    console.log('projectId:', projectId, typeof projectId);
+
+    try {
+      const { data, error } = await supabase
+        .from('generations')
+        .update({ project_id: projectId })
+        .eq('id', generationId)
+        .select();
+
+      console.log('Update result data:', data);
+      console.log('Update result error:', error);
+
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        console.warn('Update failed: No row matched or RLS blocked it.');
+      }
+
+      if (error) throw error;
+
+      toast.success('Đã chuyển file vào dự án');
+      // Remove from current view if we are filtering by project and moved to another
+      if (activeProjectId !== projectId) {
+        setHistory(prev => prev.filter(item => item.id !== generationId));
+      }
+    } catch (err) {
+      console.error('Move file error:', err);
+      toast.error('Lỗi khi di chuyển file');
+    }
+  };
+
+  const handleMoveSelected = async (targetProjectId) => {
+    if (selectedIds.length === 0) return;
+
+    const projectId = targetProjectId === 'ROOT' ? null : targetProjectId;
+
+    const movePromise = new Promise(async (resolve, reject) => {
+      const { error } = await supabase
+        .from('generations')
+        .update({ project_id: projectId })
+        .in('id', selectedIds);
+
+      if (error) reject(error);
+      else resolve();
+    });
+
+    toast.promise(movePromise, {
+      loading: 'Đang di chuyển...',
+      success: `Đã chuyển ${selectedIds.length} file vào dự án`,
+      error: (err) => `Lỗi: ${err.message}`
+    });
+
+    try {
+      await movePromise;
+      if (activeProjectId !== projectId) {
+        setHistory(prev => prev.filter(item => !selectedIds.includes(item.id)));
+      }
+      setIsSelectMode(false);
+      setSelectedIds([]);
+    } catch (err) {
+      console.error('Bulk move failed:', err);
+    }
+  };
+
   const handleReset = () => {
     setScript('');
     setVoiceId('vi-female');
@@ -240,7 +436,7 @@ const Dashboard = () => {
 
   const handleDeleteSingle = async (id, e) => {
     e.stopPropagation();
-    
+
     const deletePromise = new Promise(async (resolve, reject) => {
       const { error } = await supabase.from('generations').delete().eq('id', id);
       if (error) reject(error);
@@ -298,7 +494,7 @@ const Dashboard = () => {
   };
 
   const toggleSelect = (id) => {
-    setSelectedIds(prev => 
+    setSelectedIds(prev =>
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
   };
@@ -332,7 +528,7 @@ const Dashboard = () => {
                     <option value="vi-google">🤖 Chị Google (Meme)</option>
                   </optgroup>
                 </select>
-                <button 
+                <button
                   className="btn btn-outline small-btn preview-btn"
                   onClick={handlePreviewVoice}
                   disabled={isPreviewing}
@@ -426,7 +622,7 @@ const Dashboard = () => {
           <div className="studio-footer">
             <span className="char-count">
               {script.length} / {voiceId.startsWith('vi-zalo-') ? 2000 : 5000} ký tự
-              {zaloCharsUsed > 0 && <span style={{marginLeft: '15px', color: 'var(--primary-color)'}}>• Đã dùng Zalo AI: {zaloCharsUsed} ký tự hôm nay</span>}
+              {zaloCharsUsed > 0 && <span style={{ marginLeft: '15px', color: 'var(--primary-color)' }}>• Đã dùng Zalo AI: {zaloCharsUsed} ký tự hôm nay</span>}
             </span>
             <div className="footer-actions" style={{ display: 'flex', gap: '1rem' }}>
               <button
@@ -448,10 +644,69 @@ const Dashboard = () => {
         </div>
 
         <div className="studio-sidebar glass-panel">
-          <div className="history-header">
+          <div className="projects-section">
+            <div className="projects-header">
+              <h3><FolderOpen size={20} /> Dự án của bạn</h3>
+              <button
+                className="btn btn-outline small-btn"
+                onClick={() => setIsCreatingProject(!isCreatingProject)}
+                title="Tạo dự án mới"
+              >
+                <FolderPlus size={16} />
+              </button>
+            </div>
+
+            {isCreatingProject && (
+              <form onSubmit={handleCreateProject} className="create-project-form">
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="Tên dự án..."
+                  value={newProjectName}
+                  onChange={e => setNewProjectName(e.target.value)}
+                  autoFocus
+                />
+                <button type="submit" className="btn btn-primary small-btn" disabled={!newProjectName.trim()}>Lưu</button>
+              </form>
+            )}
+
+            <div className="projects-list">
+              <div
+                className={`project-item ${activeProjectId === null ? 'active' : ''}`}
+                onClick={() => setActiveProjectId(null)}
+                onDragOver={handleDragOver}
+                onDrop={e => handleDrop(e, null)}
+              >
+                <div className="project-icon"><Folder size={18} /></div>
+                <span>Tất cả file</span>
+              </div>
+
+              {projects.map(project => (
+                <div
+                  key={project.id}
+                  className={`project-item ${activeProjectId === project.id ? 'active' : ''}`}
+                  onClick={() => setActiveProjectId(project.id)}
+                  onDragOver={handleDragOver}
+                  onDrop={e => handleDrop(e, project.id)}
+                >
+                  <div className="project-icon"><Folder size={18} /></div>
+                  <span style={{ flex: 1 }}>{project.name}</span>
+                  <button
+                    className="icon-btn delete-project-btn"
+                    onClick={(e) => confirmDeleteProject(project, e)}
+                    title="Xóa dự án"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="history-header" style={{ marginTop: '2rem' }}>
             <h3>📋 Lịch sử</h3>
             {history.length > 0 && (
-              <button 
+              <button
                 className="btn btn-outline small-btn"
                 onClick={() => {
                   setIsSelectMode(!isSelectMode);
@@ -464,18 +719,33 @@ const Dashboard = () => {
           </div>
 
           {isSelectMode && (
-            <div className="history-select-actions">
-              <button className="btn btn-outline small-btn" onClick={toggleSelectAll}>
-                {selectedIds.length === history.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
-              </button>
-              <button 
-                className="btn btn-primary small-btn" 
-                onClick={handleDeleteSelected}
+            <div className="history-select-actions" style={{ flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button className="btn btn-outline small-btn" onClick={toggleSelectAll} style={{ flex: 1 }}>
+                  {selectedIds.length === history.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                </button>
+                <button
+                  className="btn btn-primary small-btn"
+                  onClick={handleDeleteSelected}
+                  disabled={selectedIds.length === 0}
+                  style={{ background: 'var(--error-color, #ef4444)', borderColor: 'var(--error-color, #ef4444)', flex: 1 }}
+                >
+                  Xóa ({selectedIds.length})
+                </button>
+              </div>
+              <select
+                className="input-field select-voice"
+                style={{ width: '100%', padding: '0.5rem', fontSize: '0.875rem' }}
+                value=""
+                onChange={(e) => handleMoveSelected(e.target.value)}
                 disabled={selectedIds.length === 0}
-                style={{ background: 'var(--error-color, #ef4444)', borderColor: 'var(--error-color, #ef4444)' }}
               >
-                Xóa ({selectedIds.length})
-              </button>
+                <option value="" disabled>Chuyển {selectedIds.length} mục vào dự án...</option>
+                <option value="ROOT">📂 Bỏ ra ngoài (Tất cả file)</option>
+                {projects.map(p => (
+                  <option key={p.id} value={p.id}>📁 {p.name}</option>
+                ))}
+              </select>
             </div>
           )}
 
@@ -486,68 +756,90 @@ const Dashboard = () => {
             {history.map(item => {
               const isSelected = selectedIds.includes(item.id);
               return (
-              <div
-                key={item.id}
-                className={`history-item ${isSelectMode && isSelected ? 'selected' : ''}`}
-                style={{ cursor: 'pointer' }}
-                onClick={() => {
-                  if (isSelectMode) {
-                    toggleSelect(item.id);
-                    return;
-                  }
-                  setScript(item.fullText);
-                  if (item.voiceId) setVoiceId(item.voiceId);
-                  setAudioUrl(item.url);
-                  setIsPlaying(false);
-                }}
-              >
-                {isSelectMode && (
-                  <div className="history-checkbox">
-                    {isSelected ? <CheckSquare size={18} color="var(--accent-color)" /> : <Square size={18} color="var(--text-secondary)" />}
-                  </div>
-                )}
-                <div className="history-info" style={{ opacity: isSelectMode && !isSelected ? 0.7 : 1 }}>
-                  <h4>{item.time} • {item.voice}</h4>
-                  <p>"{item.text}..."</p>
-                </div>
-                <div className="history-actions">
-                  {!isSelectMode && (
-                    <>
-                      <button className="icon-btn" onClick={(e) => {
-                        e.stopPropagation();
-                        if (audioUrl === item.url && isPlaying) {
-                          audioRef.current?.pause();
-                          setIsPlaying(false);
-                        } else {
-                          setScript(item.fullText);
-                          if (item.voiceId) setVoiceId(item.voiceId);
-                          setAudioUrl(item.url);
-                          setIsPlaying(true);
-                          // Nếu đang phát cùng 1 URL nhưng bị pause, thì phát lại
-                          if (audioUrl === item.url) {
-                            audioRef.current?.play();
-                          }
-                        }
-                      }}>
-                        {audioUrl === item.url && isPlaying ? <Pause size={16} /> : <Play size={16} />}
-                      </button>
-                      <button className="icon-btn" onClick={(e) => {
-                        e.stopPropagation();
-                        handleDownload(item.url);
-                      }}>
-                        <Download size={16} />
-                      </button>
-                      <button className="icon-btn" onClick={(e) => handleDeleteSingle(item.id, e)}>
-                        <Trash2 size={16} />
-                      </button>
-                    </>
+                <div
+                  key={item.id}
+                  className={`history-item draggable-item ${isSelectMode && isSelected ? 'selected' : ''}`}
+                  style={{ cursor: isSelectMode ? 'pointer' : 'grab' }}
+                  draggable={!isSelectMode}
+                  onDragStart={e => handleDragStart(e, item.id)}
+                  onClick={() => {
+                    if (isSelectMode) {
+                      toggleSelect(item.id);
+                      return;
+                    }
+                    setScript(item.fullText);
+                    if (item.voiceId) setVoiceId(item.voiceId);
+                    setAudioUrl(item.url);
+                    setIsPlaying(false);
+                  }}
+                >
+                  {isSelectMode && (
+                    <div className="history-checkbox">
+                      {isSelected ? <CheckSquare size={18} color="var(--accent-color)" /> : <Square size={18} color="var(--text-secondary)" />}
+                    </div>
                   )}
+                  <div className="history-info" style={{ opacity: isSelectMode && !isSelected ? 0.7 : 1 }}>
+                    <h4>{item.time} • {item.voice}</h4>
+                    <p>"{item.text}..."</p>
+                  </div>
+                  <div className="history-actions">
+                    {!isSelectMode && (
+                      <>
+                        <button className="icon-btn" onClick={(e) => {
+                          e.stopPropagation();
+                          if (audioUrl === item.url && isPlaying) {
+                            audioRef.current?.pause();
+                            setIsPlaying(false);
+                          } else {
+                            setScript(item.fullText);
+                            if (item.voiceId) setVoiceId(item.voiceId);
+                            setAudioUrl(item.url);
+                            setIsPlaying(true);
+                            // Nếu đang phát cùng 1 URL nhưng bị pause, thì phát lại
+                            if (audioUrl === item.url) {
+                              audioRef.current?.play();
+                            }
+                          }
+                        }}>
+                          {audioUrl === item.url && isPlaying ? <Pause size={16} /> : <Play size={16} />}
+                        </button>
+                        <button className="icon-btn" onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownload(item.url);
+                        }}>
+                          <Download size={16} />
+                        </button>
+                        <button className="icon-btn" onClick={(e) => handleDeleteSingle(item.id, e)}>
+                          <Trash2 size={16} />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )})}
+              )
+            })}
           </div>
         </div>
       </div>
+      {projectToDelete && (
+        <div className="modal-overlay">
+          <div className="modal-content glass-panel" style={{ maxWidth: '400px', margin: '0 auto' }}>
+            <h3 style={{ marginTop: 0 }}>Xóa dự án?</h3>
+            <p>Bạn có chắc chắn muốn xóa dự án <strong>{projectToDelete.name}</strong> không?</p>
+            {projectToDelete.fileCount > 0 && (
+              <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '0.75rem', borderRadius: '6px', marginTop: '1rem', color: '#fca5a5' }}>
+                ⚠️ Cảnh báo: Dự án này đang chứa <strong>{projectToDelete.fileCount} file âm thanh</strong>. Xóa dự án sẽ xóa tất cả các file bên trong!
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', justifyContent: 'flex-end' }}>
+              <button className="btn btn-outline" onClick={() => setProjectToDelete(null)}>Hủy bỏ</button>
+              <button className="btn btn-primary" onClick={handleDeleteProject} style={{ background: 'var(--error-color, #ef4444)', borderColor: 'var(--error-color, #ef4444)' }}>
+                Vâng, Xóa dự án
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
