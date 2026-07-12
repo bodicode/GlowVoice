@@ -119,9 +119,22 @@ async def generate_audio(request: TTSRequest):
     voice_info = VOICES.get(request.voice_id, VOICES["vi-female"])
     voice_name = voice_info["id"]
 
-    # Tạo tên file duy nhất
-    filename = f"{uuid.uuid4().hex}.mp3"
+    import hashlib
+    # Tạo tên file hash từ nội dung để làm bộ nhớ đệm (cache)
+    cache_key = f"{request.text}|{request.voice_id}|{request.rate}|{request.volume}|{request.pitch}"
+    filename = hashlib.md5(cache_key.encode('utf-8')).hexdigest() + ".mp3"
     filepath = os.path.join(OUTPUT_DIR, filename)
+
+    # Nếu file đã tồn tại, trả về luôn không cần gọi API (tiết kiệm quota)
+    if os.path.exists(filepath):
+        return {
+            "status": "success",
+            "audio_url": f"/api/audio/{filename}",
+            "text_processed": request.text,
+            "voice_used": voice_info["name"],
+            "char_count": len(request.text),
+            "cached": True
+        }
 
     try:
         if request.voice_id == "vi-google":
