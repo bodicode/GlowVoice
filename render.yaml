@@ -8,5 +8,7 @@ services:
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: FRONTEND_URL
-        value: https://your-app.vercel.app
+        value: https://glowvoice.vercel.app
+      - key: ZALO_AI_KEY
+        sync: false
     healthCheckPath: /

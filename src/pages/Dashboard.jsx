@@ -142,6 +142,12 @@ const Dashboard = () => {
 
   const handlePreviewVoice = async () => {
     setIsPreviewing(true);
+    
+    // Mẹo "Unlock" âm thanh cho trình duyệt: tạo Audio và play ngay lúc click
+    const audio = new Audio();
+    audio.play().catch(() => {});
+    audio.pause();
+
     try {
       const rateStr = rate >= 0 ? `+${rate}%` : `${rate}%`;
       const pitchStr = pitch >= 0 ? `+${pitch}Hz` : `${pitch}Hz`;
@@ -158,9 +164,11 @@ const Dashboard = () => {
 
       const data = await response.json();
       if (data.status === 'success') {
-        const fullUrl = `${API_URL}${data.audio_url}`;
-        const audio = new Audio(fullUrl);
-        audio.play();
+        audio.src = `${API_URL}${data.audio_url}`;
+        audio.play().catch(e => {
+          console.error("Lỗi phát âm thanh:", e);
+          toast.error("Không thể phát âm thanh, có thể do trình duyệt chặn.");
+        });
       } else {
         toast.error('Lỗi khi nghe thử: ' + (data.message || 'Có lỗi xảy ra'));
       }
