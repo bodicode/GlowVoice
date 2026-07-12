@@ -184,7 +184,7 @@ const Dashboard = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text: "Xin chào, đây là giọng đọc thử.",
+          text: "Xin chào",
           voice_id: voiceId,
           rate: rateStr,
           pitch: pitchStr
@@ -306,7 +306,7 @@ const Dashboard = () => {
   return (
     <div className="dashboard-page container animate-fade-in">
       <div className="dashboard-header">
-        <h2>Studio</h2>
+        <h2>Xin chào, {user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'bạn'} 👋</h2>
         <p>Nhập văn bản và tạo giọng đọc AI tiếng Việt tự nhiên.</p>
       </div>
 
