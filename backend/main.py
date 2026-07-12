@@ -150,7 +150,7 @@ async def generate_audio(request: TTSRequest):
             }
             
             async with httpx.AsyncClient(timeout=30.0) as client:
-                zalo_res = await client.post("https://api.zalo.ai/v1a/tts/synthesize", headers=headers, data=data)
+                zalo_res = await client.post("https://api.zalo.ai/v1/tts/synthesize", headers=headers, data=data)
                 
                 if zalo_res.status_code != 200:
                     return {"status": "error", "message": f"Lỗi Zalo API: {zalo_res.text}"}
