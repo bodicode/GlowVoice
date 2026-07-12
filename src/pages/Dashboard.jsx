@@ -77,6 +77,14 @@ const Dashboard = () => {
     fetchHistory();
   }, [user, navigate]);
 
+  useEffect(() => {
+    const max = voiceId.startsWith('vi-zalo-') ? 2000 : 5000;
+    if (script.length > max) {
+      setScript(prev => prev.slice(0, max));
+      toast.error(`Đã tự động cắt bớt văn bản vì giọng này chỉ hỗ trợ tối đa ${max} ký tự.`);
+    }
+  }, [voiceId]);
+
   if (!user) return null;
 
   const handleGenerate = async () => {
@@ -380,7 +388,7 @@ const Dashboard = () => {
             className="input-field script-input"
             placeholder="Nhập văn bản bạn muốn chuyển thành giọng nói tại đây..."
             value={script}
-            onChange={(e) => setScript(e.target.value.slice(0, 5000))}
+            onChange={(e) => setScript(e.target.value.slice(0, voiceId.startsWith('vi-zalo-') ? 2000 : 5000))}
           ></textarea>
 
           {audioUrl && (
@@ -417,7 +425,7 @@ const Dashboard = () => {
 
           <div className="studio-footer">
             <span className="char-count">
-              {script.length} / 5000 ký tự
+              {script.length} / {voiceId.startsWith('vi-zalo-') ? 2000 : 5000} ký tự
               {zaloCharsUsed > 0 && <span style={{marginLeft: '15px', color: 'var(--primary-color)'}}>• Đã dùng Zalo AI: {zaloCharsUsed} ký tự hôm nay</span>}
             </span>
             <div className="footer-actions" style={{ display: 'flex', gap: '1rem' }}>
