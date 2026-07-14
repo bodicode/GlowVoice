@@ -6,3 +6,4 @@ python-multipart==0.0.9
 gTTS==2.5.4
 httpx
 python-dotenv
+supabase

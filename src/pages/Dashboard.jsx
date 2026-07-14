@@ -21,6 +21,10 @@ const Dashboard = () => {
   const [pitch, setPitch] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
   const [history, setHistory] = useState([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const ITEMS_PER_PAGE = 50;
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [zaloCharsUsed, setZaloCharsUsed] = useState(0);
@@ -30,6 +34,53 @@ const Dashboard = () => {
   const [newProjectName, setNewProjectName] = useState('');
   const [projectToDelete, setProjectToDelete] = useState(null);
   const audioRef = useRef(null);
+
+  const loadHistory = async (pageNumber = 1) => {
+    if (!user) return;
+    if (pageNumber > 1) setIsLoadingMore(true);
+    
+    try {
+      let query = supabase
+        .from('generations')
+        .select('*', { count: 'exact' })
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .range((pageNumber - 1) * ITEMS_PER_PAGE, pageNumber * ITEMS_PER_PAGE - 1);
+
+      if (activeProjectId) {
+        query = query.eq('project_id', activeProjectId);
+      } else {
+        query = query.is('project_id', null);
+      }
+
+      const { data, count, error } = await query;
+
+      if (error) {
+        console.error('Chưa có bảng generations hoặc lỗi:', error.message);
+      } else if (data) {
+        const formatted = data.map(item => ({
+          id: item.id,
+          text: item.text,
+          fullText: item.full_text,
+          url: item.audio_url?.startsWith('http') ? item.audio_url : `${API_URL}${item.audio_url?.startsWith('/') ? '' : '/'}${item.audio_url}`,
+          voice: item.voice_name,
+          voiceId: item.voice_id,
+          time: new Date(item.created_at).toLocaleTimeString('vi-VN')
+        }));
+
+        if (pageNumber === 1) {
+          setHistory(formatted);
+        } else {
+          setHistory(prev => [...prev, ...formatted]);
+        }
+        setHasMore(pageNumber * ITEMS_PER_PAGE < count);
+      }
+    } catch (err) {
+      console.error('Lỗi lấy lịch sử:', err);
+    } finally {
+      if (pageNumber > 1) setIsLoadingMore(false);
+    }
+  };
 
   useEffect(() => {
     if (!user) {
@@ -52,38 +103,8 @@ const Dashboard = () => {
       }
     };
 
-    const fetchHistory = async () => {
+    const fetchZaloStats = async () => {
       try {
-        let query = supabase
-          .from('generations')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(50);
-
-        if (activeProjectId) {
-          query = query.eq('project_id', activeProjectId);
-        } else {
-          query = query.is('project_id', null);
-        }
-
-        const { data, error } = await query;
-
-        if (error) {
-          console.error('Chưa có bảng generations hoặc lỗi:', error.message);
-        } else if (data) {
-          setHistory(data.map(item => ({
-            id: item.id,
-            text: item.text,
-            fullText: item.full_text,
-            url: item.audio_url,
-            voice: item.voice_name,
-            voiceId: item.voice_id,
-            time: new Date(item.created_at).toLocaleTimeString('vi-VN')
-          })));
-        }
-
-        // Fetch Zalo AI used characters today
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const { data: zaloData } = await supabase
@@ -98,13 +119,20 @@ const Dashboard = () => {
           setZaloCharsUsed(total);
         }
       } catch (err) {
-        console.error('Lỗi lấy lịch sử:', err);
+        console.error('Lỗi lấy thống kê Zalo:', err);
       }
     };
 
     fetchProjects();
-    fetchHistory();
-  }, [user, navigate, activeProjectId]);
+    fetchZaloStats();
+  }, [user, navigate]);
+
+  useEffect(() => {
+    if (user) {
+      setPage(1);
+      loadHistory(1);
+    }
+  }, [user, activeProjectId]);
 
   useEffect(() => {
     const max = voiceId.startsWith('vi-zalo-') ? 2000 : 5000;
@@ -138,7 +166,7 @@ const Dashboard = () => {
 
       const data = await response.json();
       if (data.status === 'success') {
-        const fullUrl = `${API_URL}${data.audio_url}`;
+        const fullUrl = data.audio_url?.startsWith('http') ? data.audio_url : `${API_URL}${data.audio_url?.startsWith('/') ? '' : '/'}${data.audio_url}`;
         setAudioUrl(fullUrl);
 
         const newHistoryItem = {
@@ -168,7 +196,7 @@ const Dashboard = () => {
               voice: newHistoryItem.voice_name,
               voiceId: voiceId,
               time: new Date().toLocaleTimeString('vi-VN')
-            }, ...prev].slice(0, 20));
+            }, ...prev]);
           } else if (insertedData) {
             setHistory(prev => [{
               id: insertedData.id,
@@ -178,7 +206,7 @@ const Dashboard = () => {
               voice: insertedData.voice_name,
               voiceId: insertedData.voice_id,
               time: new Date(insertedData.created_at).toLocaleTimeString('vi-VN')
-            }, ...prev].slice(0, 20));
+            }, ...prev]);
 
             // Cập nhật số lượng ký tự Zalo AI nếu dùng giọng Zalo
             if (voiceId.startsWith('vi-zalo-') && !data.cached) {
@@ -223,7 +251,7 @@ const Dashboard = () => {
 
       const data = await response.json();
       if (data.status === 'success') {
-        audio.src = `${API_URL}${data.audio_url}`;
+        audio.src = data.audio_url?.startsWith('http') ? data.audio_url : `${API_URL}${data.audio_url?.startsWith('/') ? '' : '/'}${data.audio_url}`;
         audio.play().catch(e => {
           console.error("Lỗi phát âm thanh:", e);
           toast.error("Không thể phát âm thanh, có thể do trình duyệt chặn.");
@@ -588,7 +616,7 @@ const Dashboard = () => {
           ></textarea>
 
           {audioUrl && (
-            <div className="audio-player glass-panel">
+            <div className={`audio-player glass-panel ${isPlaying ? 'glow-pulse' : ''}`}>
               <audio
                 key={audioUrl}
                 ref={audioRef}
@@ -596,10 +624,20 @@ const Dashboard = () => {
                 autoPlay={isPlaying}
                 onEnded={() => setIsPlaying(false)}
                 onLoadedData={() => {
-                  // Tự động play khi tải xong audio mới nếu isPlaying=true
+                  if (isPlaying) {
+                    audioRef.current?.play().catch(err => {
+                      console.error('Không thể phát audio tự động:', err);
+                      setIsPlaying(false);
+                    });
+                  }
+                }}
+                onError={() => {
+                  console.error('Lỗi tải file âm thanh:', audioUrl);
+                  setIsPlaying(false);
+                  toast.error('Không thể phát file này (có thể file đã bị xóa trên server).');
                 }}
               />
-              <button className="play-btn" onClick={togglePlay}>
+              <button className={`play-btn ${isPlaying ? 'glow-pulse' : ''}`} onClick={togglePlay}>
                 {isPlaying ? (
                   <Pause size={20} color="#ffffff" fill="#ffffff" />
                 ) : (
@@ -818,6 +856,22 @@ const Dashboard = () => {
                 </div>
               )
             })}
+            
+            {hasMore && (
+              <div style={{ textAlign: 'center', marginTop: '1rem', paddingBottom: '1rem' }}>
+                <button
+                  className="btn btn-outline small-btn"
+                  onClick={() => {
+                    const nextPage = page + 1;
+                    setPage(nextPage);
+                    loadHistory(nextPage);
+                  }}
+                  disabled={isLoadingMore}
+                >
+                  {isLoadingMore ? <><RefreshCw size={16} className="spin" /> Đang tải...</> : 'Tải thêm lịch sử'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

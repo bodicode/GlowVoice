@@ -47,6 +47,16 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 # Lấy Zalo API Key
 ZALO_AI_KEY = os.environ.get("ZALO_AI_KEY", "")
 
+# Khởi tạo Supabase Client
+try:
+    # pyrefly: ignore [missing-import]
+    from supabase import create_client, Client
+    SUPABASE_URL = os.environ.get("VITE_SUPABASE_URL", "")
+    SUPABASE_KEY = os.environ.get("VITE_SUPABASE_ANON_KEY", "")
+    supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
+except ImportError:
+    supabase_client = None
+
 # Danh sách giọng đọc tiếng Việt có sẵn
 VOICES = {
     "vi-female": {
@@ -125,11 +135,25 @@ async def generate_audio(request: TTSRequest):
     filename = hashlib.md5(cache_key.encode('utf-8')).hexdigest() + ".mp3"
     filepath = os.path.join(OUTPUT_DIR, filename)
 
-    # Nếu file đã tồn tại, trả về luôn không cần gọi API (tiết kiệm quota)
+    # Nếu file đã tồn tại cục bộ, trả về luôn không cần gọi TTS API (tiết kiệm quota)
     if os.path.exists(filepath):
+        final_audio_url = f"/api/audio/{filename}"
+        if supabase_client:
+            try:
+                # Đảm bảo file có trên Supabase
+                with open(filepath, "rb") as f:
+                    supabase_client.storage.from_("audio").upload(
+                        file=f,
+                        path=filename,
+                        file_options={"content-type": "audio/mpeg", "upsert": "true"}
+                    )
+                final_audio_url = supabase_client.storage.from_("audio").get_public_url(filename)
+            except Exception as upload_err:
+                print(f"Lỗi upload cache lên Supabase Storage: {str(upload_err)}")
+
         return {
             "status": "success",
-            "audio_url": f"/api/audio/{filename}",
+            "audio_url": final_audio_url,
             "text_processed": request.text,
             "voice_used": voice_info["name"],
             "char_count": len(request.text),
@@ -192,9 +216,26 @@ async def generate_audio(request: TTSRequest):
             )
             await communicate.save(filepath)
 
+        # Upload file to Supabase Storage
+        final_audio_url = f"/api/audio/{filename}"
+        if supabase_client:
+            try:
+                with open(filepath, "rb") as f:
+                    supabase_client.storage.from_("audio").upload(
+                        file=f,
+                        path=filename,
+                        file_options={"content-type": "audio/mpeg", "upsert": "true"}
+                    )
+                # Get public URL
+                public_url = supabase_client.storage.from_("audio").get_public_url(filename)
+                if public_url:
+                    final_audio_url = public_url
+            except Exception as upload_err:
+                print(f"Lỗi upload lên Supabase Storage: {str(upload_err)}")
+
         return {
             "status": "success",
-            "audio_url": f"/api/audio/{filename}",
+            "audio_url": final_audio_url,
             "text_processed": request.text,
             "voice_used": voice_info["name"],
             "char_count": len(request.text)

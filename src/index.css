@@ -2,16 +2,40 @@
 
 :root {
   --font-primary: 'Outfit', sans-serif;
-  --bg-color: #0f172a;
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
+  --bg-color: #080b18;
+  --text-primary: #f0f4ff;
+  --text-secondary: #8892b0;
   --accent-color: #8b5cf6;
   --accent-hover: #7c3aed;
-  --glass-bg: rgba(30, 41, 59, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --primary-color: #8b5cf6;
+  --primary-light: #a78bfa;
+  --secondary-color: #3b82f6;
+  /* Glass: đủ trong suốt để aurora phía sau thấy qua */
+  --glass-bg: rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --glass-highlight: rgba(255, 255, 255, 0.18);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
   --danger: #ef4444;
   --success: #10b981;
+  --surface-dark: rgba(255, 255, 255, 0.04);
+  --surface-light: rgba(255, 255, 255, 0.10);
+}
+
+/* Aurora background - 4 color blobs cho chiều sâu */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 10% 20%, rgba(139, 92, 246, 0.28) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 85% 15%, rgba(56, 189, 248, 0.22) 0%, transparent 55%),
+    radial-gradient(ellipse 45% 50% at 60% 80%, rgba(236, 72, 153, 0.16) 0%, transparent 55%),
+    radial-gradient(ellipse 55% 40% at 30% 70%, rgba(59, 130, 246, 0.18) 0%, transparent 55%);
+  pointer-events: none;
+  z-index: 0;
 }
 
 body {
@@ -21,12 +45,10 @@ body {
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-image: radial-gradient(circle at 15% 50%, rgba(139, 92, 246, 0.15), transparent 25%),
-                    radial-gradient(circle at 85% 30%, rgba(56, 189, 248, 0.15), transparent 25%);
   min-height: 100vh;
-  /* Hide scrollbar for IE, Edge and Firefox */
   -ms-overflow-style: none;
   scrollbar-width: none;
+  position: relative;
 }
 
 /* Hide scrollbar for Chrome, Safari and Opera */
@@ -38,18 +60,28 @@ body {
   box-sizing: border-box;
 }
 
-/* Glassmorphism utility */
+/* Glassmorphism - đủ trong để thấy aurora phía sau */
 .glass-panel {
   background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  /* Inner highlight ở viền trên tạo cảm giác 3D */
+  border-top-color: var(--glass-highlight);
+  box-shadow: var(--glass-shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
   border-radius: 16px;
+  position: relative;
+  z-index: 1;
 }
 
 /* Typography */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   margin: 0;
   font-weight: 600;
   color: var(--text-primary);
@@ -59,7 +91,7 @@ h1 {
   font-size: 3.5rem;
   line-height: 1.2;
   letter-spacing: -0.02em;
-  background: linear-gradient(135deg, #e2e8f0 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, #e2e8f0 0%, #a78bfa 60%, #60a5fa 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -80,7 +112,7 @@ a {
 }
 
 a:hover {
-  color: var(--accent-hover);
+  color: var(--primary-light);
 }
 
 /* Buttons */
@@ -95,55 +127,94 @@ a:hover {
   border-radius: 9999px;
   border: none;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
   gap: 0.5rem;
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+}
+
+/* ✨ Animation 1: Button Shimmer — ánh sáng quét qua khi hover */
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg,
+      transparent 25%,
+      rgba(255, 255, 255, 0.18) 50%,
+      transparent 75%);
+  background-size: 200% 100%;
+  background-position: 200% 0;
+  border-radius: inherit;
+  transition: background-position 0.6s ease;
+  pointer-events: none;
+}
+
+.btn:hover::after {
+  background-position: -200% 0;
 }
 
 .btn-primary {
   background: linear-gradient(135deg, var(--accent-color) 0%, #3b82f6 100%);
   color: white;
-  box-shadow: 0 4px 14px 0 rgba(139, 92, 246, 0.39);
+  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.45);
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.23);
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 10px 32px rgba(139, 92, 246, 0.6);
+}
+
+.btn-primary:active {
+  transform: translateY(-1px) scale(0.99);
+  transition-duration: 0.1s;
 }
 
 .btn-outline {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.06);
   color: var(--text-primary);
   border: 1px solid var(--glass-border);
+  backdrop-filter: blur(10px);
 }
 
 .btn-outline:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
 }
 
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
   transform: none !important;
+}
+
+.btn:disabled::after {
+  display: none;
 }
 
 /* Inputs */
 .input-field {
   width: 100%;
   padding: 0.75rem 1rem;
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--glass-border);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--text-primary);
   font-family: var(--font-primary);
   font-size: 1rem;
-  transition: all 0.2s ease;
+  transition: border-color 0.25s ease, background 0.25s ease, box-shadow 0.35s ease;
   outline: none;
 }
 
+/* ✨ Animation 3: Input Focus Glow Ring — ring mở rộng từ trong ra ngoài */
 .input-field:focus {
-  border-color: var(--accent-color);
-  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+  border-color: rgba(139, 92, 246, 0.7);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 0 0 1px rgba(139, 92, 246, 0.4),
+    0 0 0 4px rgba(139, 92, 246, 0.12),
+    0 0 20px rgba(139, 92, 246, 0.1);
 }
 
 textarea.input-field {
@@ -155,7 +226,7 @@ textarea.input-field {
 .container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 1.5rem;
+  /* padding: 0 1.5rem; */
 }
 
 .flex-center {
@@ -164,14 +235,125 @@ textarea.input-field {
   justify-content: center;
 }
 
-/* Animations */
+/* ═══════════════════════════════
+   ANIMATIONS LIBRARY
+   ═══════════════════════════════ */
+
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-fade-in {
   animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ✨ Animation 2: Glow Pulse — vòng sáng nháy nhẹ (dùng cho audio player đang phát) */
+@keyframes glowPulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(139, 92, 246, 0.3),
+      0 0 20px rgba(139, 92, 246, 0.1);
+  }
+
+  50% {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.7),
+      0 0 45px rgba(139, 92, 246, 0.25),
+      0 0 80px rgba(59, 130, 246, 0.1);
+  }
+}
+
+.glow-pulse {
+  animation: glowPulse 2.2s ease-in-out infinite;
+}
+
+/* Aurora drift nhẹ nhàng cho background blobs */
+@keyframes auroraDrift {
+
+  0%,
+  100% {
+    transform: scale(1) translate(0, 0);
+  }
+
+  33% {
+    transform: scale(1.05) translate(1.5%, 1%);
+  }
+
+  66% {
+    transform: scale(0.97) translate(-1%, 1.5%);
+  }
+}
+
+body::before {
+  animation: auroraDrift 18s ease-in-out infinite;
+}
+
+/* ✨ Animation 4: Scroll Reveal — fade+slide vào khi phần tử vào viewport */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.reveal-delay-1 {
+  transition-delay: 0.1s;
+}
+
+.reveal-delay-2 {
+  transition-delay: 0.2s;
+}
+
+.reveal-delay-3 {
+  transition-delay: 0.3s;
+}
+
+.reveal-delay-4 {
+  transition-delay: 0.4s;
+}
+
+/* ✨ Animation 2b: Card Hover Depth — glass panel nổi lên khi hover */
+.glass-panel {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.glass-panel:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--glass-shadow),
+    0 20px 40px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  border-top-color: rgba(255, 255, 255, 0.25);
+}
+
+/* Glow utility */
+.glow-accent {
+  box-shadow: 0 0 30px rgba(139, 92, 246, 0.35);
+}
+
+/* Accessibility: tắt animation khi user prefer */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Global Responsive Adjustments */
@@ -179,12 +361,15 @@ textarea.input-field {
   h1 {
     font-size: 2.5rem;
   }
+
   h2 {
     font-size: 1.75rem;
   }
+
   .container {
     padding: 0 1.25rem;
   }
+
   .btn {
     padding: 0.6rem 1.25rem;
     font-size: 0.95rem;
@@ -195,9 +380,11 @@ textarea.input-field {
   h1 {
     font-size: 2rem;
   }
+
   h2 {
     font-size: 1.5rem;
   }
+
   .container {
     padding: 0 1rem;
   }
