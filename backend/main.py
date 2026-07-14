@@ -51,11 +51,20 @@ ZALO_AI_KEY = os.environ.get("ZALO_AI_KEY", "")
 try:
     # pyrefly: ignore [missing-import]
     from supabase import create_client, Client
-    SUPABASE_URL = os.environ.get("VITE_SUPABASE_URL", "")
-    SUPABASE_KEY = os.environ.get("VITE_SUPABASE_ANON_KEY", "")
-    supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
+    SUPABASE_URL = os.environ.get("SUPABASE_URL") or os.environ.get("VITE_SUPABASE_URL", "")
+    SUPABASE_KEY = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("VITE_SUPABASE_ANON_KEY", "")
+    if SUPABASE_URL and SUPABASE_KEY:
+        supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        print(f"[Supabase] Kết nối thành công: {SUPABASE_URL[:40]}...")
+    else:
+        supabase_client = None
+        print("[Supabase] WARN: Không tìm thấy SUPABASE_URL hoặc SUPABASE_ANON_KEY trong biến môi trường!")
 except ImportError:
     supabase_client = None
+    print("[Supabase] WARN: Thư viện supabase chưa được cài đặt.")
+except Exception as e:
+    supabase_client = None
+    print(f"[Supabase] ERROR: Khởi tạo thất bại: {e}")
 
 # Danh sách giọng đọc tiếng Việt có sẵn
 VOICES = {
@@ -221,17 +230,21 @@ async def generate_audio(request: TTSRequest):
         if supabase_client:
             try:
                 with open(filepath, "rb") as f:
-                    supabase_client.storage.from_("audio").upload(
+                    upload_res = supabase_client.storage.from_("audio").upload(
                         file=f,
                         path=filename,
                         file_options={"content-type": "audio/mpeg", "upsert": "true"}
                     )
+                print(f"[Supabase] Upload OK: {upload_res}")
                 # Get public URL
                 public_url = supabase_client.storage.from_("audio").get_public_url(filename)
                 if public_url:
                     final_audio_url = public_url
+                    print(f"[Supabase] Public URL: {final_audio_url}")
             except Exception as upload_err:
-                print(f"Lỗi upload lên Supabase Storage: {str(upload_err)}")
+                print(f"[Supabase] Lỗi upload: {type(upload_err).__name__}: {str(upload_err)}")
+        else:
+            print("[Supabase] supabase_client là None, bỏ qua upload.")
 
         return {
             "status": "success",
