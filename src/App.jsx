@@ -5,6 +5,9 @@ import LandingPage from './pages/LandingPage';
 import AuthPage from './pages/AuthPage';
 import Dashboard from './pages/Dashboard';
 
+import ProfilePage from './pages/ProfilePage';
+import Footer from './components/Footer';
+
 function App() {
   return (
     <>
@@ -15,8 +18,10 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/profile" element={<ProfilePage />} />
         </Routes>
       </main>
+      <Footer />
     </>
   );
 }
